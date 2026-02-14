@@ -2,25 +2,17 @@
 
 This module defines the core data processing pipeline using CocoIndex framework:
 - Sentence transformer embedding integration
-- File extension extraction utilities
+- Programming language detection for language-aware chunking
 - Dataflow transformation definitions
 - PostgreSQL table management for vector storage
 - Integration with CocoIndex's incremental processing system
 """
-
-import os
 
 import cocoindex
 import numpy as np
 from numpy.typing import NDArray
 
 from .config import get_config, get_table_name
-
-
-@cocoindex.op.function()
-def extract_extension(filename: str) -> str:
-    """Extract the extension of a filename."""
-    return os.path.splitext(filename)[1]
 
 
 @cocoindex.transform_flow()
@@ -58,10 +50,10 @@ def code_embedding_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
 
         # Process files from this source
         with data_scope[f"files_{source_name}"].row() as file:
-            file["extension"] = file["filename"].transform(extract_extension)
+            file["language"] = file["filename"].transform(cocoindex.functions.DetectProgrammingLanguage())
             file["chunks"] = file["content"].transform(
                 cocoindex.functions.SplitRecursively(),
-                language=file["extension"],
+                language=file["language"],
                 chunk_size=config.chunk_size,
                 min_chunk_size=config.min_chunk_size,
                 chunk_overlap=config.chunk_overlap,
