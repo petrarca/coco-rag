@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: cocorag-db
+    environment:
+      POSTGRES_DB: ${COCO_RAG_DB:-cocorag}
+      POSTGRES_USER: ${COCO_RAG_DB_USER:-cocorag}
+      POSTGRES_PASSWORD: ${COCO_RAG_DB_PASSWORD}
+    ports:
+      - 6432:5432
+    volumes:
+      - pg:/var/lib/postgresql/data
+      - ./init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql
+    restart: unless-stopped
+
+volumes:
+  pg:

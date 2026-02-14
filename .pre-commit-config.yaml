@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: task-fct
+        name: Run format, check, and test
+        entry: task fct
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]

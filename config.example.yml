@@ -1,0 +1,102 @@
+# Default patterns used when not explicitly specified in individual sources
+defaults:
+  included_patterns:
+    - "*.ts"
+    - "*.js"
+    - "*.html"
+    - "*.txt"
+    - "*.css"
+    - "*.py"
+    - "*.rs"
+    - "*.toml"
+    - "*.md"
+    - "*.mdx"
+    - "*.scss"
+    - "*.sass"
+    - "*.ejs"
+    - "*.yml"
+    - "*.yaml"
+    - "*.properties"
+    - "*.gradle"
+    - "*.java"
+  excluded_patterns:
+    - "**/.*"
+    - "target"
+    - "**/node_modules"
+    - "**/build"
+    - "**/dist"
+    - "**/target"
+    - "*.xml"
+
+sources:
+  - name: "project_one"
+    topic: "project1"
+    type: "local_file"
+    path: "/path/to/your/project1"
+    # Uses default patterns since none are specified
+   
+  - name: "project_two"
+    topic: "project2"
+    type: "local_file"
+    path: "/path/to/your/project2"
+    extend_included_patterns:
+      - "*.json"     # Add JSON files to default included patterns
+      - "*.xml"      # Add XML files to default included patterns
+    extend_excluded_patterns:
+      - "**/logs/**" # Add logs directories to default excluded patterns
+      - "*.tmp"      # Add temporary files to default excluded patterns
+
+  # Example of additional collections you can add:
+  # - name: "another_project"
+  #   type: "local_file"
+  #   path: "/path/to/another/project"
+  #   # Uses default patterns since none are specified
+  
+  # - name: "python_only_project"
+  #   type: "local_file"
+  #   path: "/path/to/python/project"
+  #   included_patterns:  # Override defaults to include only Python files
+  #     - "*.py"
+  #   excluded_patterns:  # Override defaults with custom exclusions
+  #     - "**/test*"
+  #     - "**/__pycache__"
+  
+  # - name: "docs_project"
+  #   type: "local_file"
+  #   path: "/path/to/docs"
+  #   included_patterns:  # Override defaults for documentation files only
+  #     - "*.md"
+  #     - "*.rst"
+  #   # excluded_patterns not specified, so defaults will be used
+  
+  # - name: "mixed_patterns_project"
+  #   type: "local_file"
+  #   path: "/path/to/mixed/project"
+  #   included_patterns:  # Start with custom included patterns
+  #     - "*.py"
+  #     - "*.js"
+  #   extend_included_patterns:  # Add more patterns to the custom ones above
+  #     - "*.json"
+  #     - "*.yaml"
+  #   # excluded_patterns not specified, so defaults will be used
+  #   extend_excluded_patterns:  # Add to default excluded patterns
+  #     - "**/cache/**"
+  #     - "*.backup"
+
+# Global settings for all sources
+settings:
+  chunk_size: 1000
+  min_chunk_size: 300
+  chunk_overlap: 300
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+#  embedding_model: "nomic-ai/nomic-embed-code"
+#  embedding_model: "Qodo/Qodo-Embed-1-1.5B"
+  table_name: "coco_rag"  # Database table name for storing embeddings
+  
+  # Reranking configuration
+  reranking_enabled: true
+  reranking_type: "auto"  # Options: "auto", "pure_functional", "spacy_nlp", "disabled"
+  candidate_multiplier: 8  # Retrieve more candidates for reranking
+  
+  # Note: To use spaCy reranker, run the dedicated installation task:
+  # task spacy:install

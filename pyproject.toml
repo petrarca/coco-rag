@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "CocoRAG"
+version = "0.1.0"
+description = "A semantic code search and indexing system that enables AI-powered code discovery and analysis"
+readme = "README.md"
+requires-python = ">=3.14"
+license = {text = "MIT"}
+authors = [
+    {name = "Wolfgang Miller"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "cocoindex[embeddings]>=0.3.8",
+    "pydantic-settings>=2.0.0",
+    "pgvector>=0.4.1",
+    "psycopg[binary,pool]",
+    "loguru>=0.7.0",
+    "typer>=0.9.0",
+    "fastmcp>=0.2.0",
+    "PyYAML>=6.0.0",
+    "rich>=13.7.0",
+    "art>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.5.0",
+]
+spacy = [
+    "spacy>=3.7.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["coco_rag", "coco_rag.rerankers"]
+
+[tool.ruff]
+line-length = 150
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "C90"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["coco_rag"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.refurb]
+ignore = ["FURB184"]

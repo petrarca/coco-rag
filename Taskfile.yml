@@ -1,0 +1,212 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Create Python virtual environment
+    cmds:
+      - |
+        if [ ! -d .venv ]; then
+          uv venv
+        else
+          echo "Virtual environment already exists"
+        fi
+
+  install:
+    desc: Install package in development mode
+    deps: [setup]
+    cmds:
+      - uv pip install --no-build-isolation -e ".[dev]"
+
+  install:all:
+    desc: Install package and spaCy with English language model
+    cmds:
+      - task: install
+      - task: spacy:install
+
+  format:
+    desc: Format code using ruff
+    cmds:
+      - .venv/bin/ruff format src tests
+
+  check:
+    desc: Check and auto-fix code using ruff
+    cmds:
+      - .venv/bin/ruff check --fix src tests
+
+  test:
+    desc: Run tests
+    cmds:
+      - .venv/bin/pytest tests
+
+  fct:
+    desc: Run format, check, and test tasks in sequence
+    cmds:
+      - task: format
+      - task: check
+      - task: test
+
+  rebuild:
+    desc: Clean all files, reinstall dependencies, and run format-check-test
+    cmds:
+      - task: clean:all
+      - task: install
+      - task: fct
+
+  # CocoRAG commands      
+  rag:setup:
+    desc: Setup all flows and exit
+    cmds:
+      - .venv/bin/python -m coco_rag.main setup {{.CLI_ARGS}}
+    
+  rag:setup:debug:
+    desc: Setup all flows with debug logging enabled
+    cmds:
+      - .venv/bin/python -m coco_rag.main setup --log-level DEBUG
+
+  rag:update:
+    desc: Update the code embedding index and exit
+    cmds:
+      - .venv/bin/python -m coco_rag.main update {{.CLI_ARGS}}
+    
+  rag:update:debug:
+    desc: Update the code embedding index with debug logging enabled
+    cmds:
+      - .venv/bin/python -m coco_rag.main update --log-level DEBUG
+
+  rag:drop:
+    desc: Drop the code embedding index and exit
+    cmds:
+      - .venv/bin/python -m coco_rag.main drop {{.CLI_ARGS}}
+    
+  rag:drop:debug:
+    desc: Drop the code embedding index with debug logging enabled
+    cmds:
+      - .venv/bin/python -m coco_rag.main drop --log-level DEBUG
+
+  run:cli:
+    desc: Run the application in interactive search mode
+    cmds:
+      - .venv/bin/python -m coco_rag.main {{.CLI_ARGS}}
+      
+  run:debug:
+    desc: Run the application in interactive search mode with debug logging
+    cmds:
+      - .venv/bin/python -m coco_rag.main --log-level DEBUG {{.CLI_ARGS}}
+
+  run:mcp:
+    desc: Run the application as MCP server with stdio transport
+    cmds:
+      - .venv/bin/python -m coco_rag.main mcp {{.CLI_ARGS}}
+            
+  run:mcp:http:
+    desc: Run the application as MCP server with HTTP transport
+    cmds:
+      - .venv/bin/python -m coco_rag.main mcp --transport http {{.CLI_ARGS}}
+      
+  clean:
+    desc: Clean up temporary files and build artifacts
+    cmds:
+      - rm -rf build/ dist/ .pytest_cache/ .ruff_cache/ **/__pycache__/ **/*.egg-info/
+      - find . -type d -name __pycache__ -exec rm -rf {} +
+      - find . -type f -name "*.pyc" -delete
+
+  clean:cache:
+    desc: Clean up HuggingFace cache to remove problematic models
+    cmds:
+      - rm -rf ~/.cache/huggingface/modules/transformers_modules/codesage*
+      - echo "Cleared CodeSage model cache"
+
+  clean:all:
+    desc: Clean up temporary files as well as .venv
+    cmds:
+      - task: clean
+      - rm -rf .venv
+
+  pre-commit:install:
+    desc: Install pre-commit hooks
+    deps: [install]
+    cmds:
+      - .venv/bin/pre-commit install
+      - .venv/bin/pre-commit install --hook-type pre-push
+
+  pre-commit:run:
+    desc: Run pre-commit hooks on all files
+    cmds:
+      - .venv/bin/pre-commit run --all-files
+
+  pre-commit:update:
+    desc: Update pre-commit hooks
+    cmds:
+      - .venv/bin/pre-commit autoupdate
+
+  pre-commit:uninstall:
+    desc: Remove pre-commit hooks
+    cmds:
+      - .venv/bin/pre-commit uninstall
+      - .venv/bin/pre-commit uninstall --hook-type pre-push
+
+  spacy:install:
+    desc: Install spaCy and download English language model
+    deps: []
+    cmds:
+      - |
+        if [ ! -d .venv ]; then
+          uv venv
+        fi
+      - uv pip install -e ".[dev]"
+      - uv sync --extra spacy --extra dev
+      - uv pip install pip  # Ensure pip is available
+      - uv run python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+      - echo "✅ spaCy and en_core_web_sm model installed successfully"
+
+  spacy:install:medium:
+    desc: Install spaCy and download medium English language model
+    deps: []
+    cmds:
+      - |
+        if [ ! -d .venv ]; then
+          uv venv
+        fi
+      - uv pip install -e ".[dev]"
+      - uv sync --extra spacy --extra dev
+      - uv pip install pip  # Ensure pip is available
+      - uv run python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl
+      - echo "✅ spaCy and en_core_web_md model installed successfully"
+
+  spacy:install:large:
+    desc: Install spaCy and download large English language model
+    deps: []
+    cmds:
+      - |
+        if [ ! -d .venv ]; then
+          uv venv
+        fi
+      - uv pip install -e ".[dev]"
+      - uv sync --extra spacy --extra dev
+      - uv pip install pip  # Ensure pip is available
+      - uv run python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+      - echo "✅ spaCy and en_core_web_lg model installed successfully"
+
+  spacy:list-models:
+    desc: List available spaCy models
+    deps: [spacy:install]
+    cmds:
+      - uv run python -m spacy download --help
+
+  spacy:test:
+    desc: Test spaCy installation and model loading
+    deps: [spacy:install]
+    cmds:
+      - |
+        uv run python -c "
+        import spacy
+        try:
+            nlp = spacy.load('en_core_web_sm')
+            print('✅ spaCy is working correctly')
+            print(f'📊 Model: {nlp.meta[\"name\"]} v{nlp.meta[\"version\"]}')
+            print(f'🧹 Vocab size: {len(nlp.vocab)} tokens')
+            doc = nlp('Test sentence for spaCy NLP processing.')
+            print(f'📝 Processed: \"{doc}\" ({len(doc)} tokens)')
+        except Exception as e:
+            print(f'❌ Error: {e}')
+        "
