@@ -104,6 +104,33 @@ task run:cli       # Interactive CLI search
 task run:mcp:http  # MCP server for AI assistants
 ```
 
+### Embedding Models
+
+CocoRAG uses [CocoIndex](https://cocoindex.io) for embedding generation, supporting multiple model sources:
+
+**Local Models (Default)**
+- SentenceTransformers models are downloaded automatically on first use
+- Default: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions, ~80MB)
+- No API keys or external services required
+- Configure via `embedding_model` in `config.yml`
+
+**Local Services**
+- [Ollama](https://ollama.ai/) - Run embedding models locally
+  - Example: `nomic-embed-text` (768 dimensions)
+  - Install Ollama, then: `ollama pull nomic-embed-text`
+  - Configure using CocoIndex's `EmbedText` function with `api_type=LlmApiType.OLLAMA`
+
+**API Providers**
+- **OpenAI**: `text-embedding-3-small`, `text-embedding-3-large`
+- **Azure OpenAI**: Same models via Azure cloud
+- **Google Gemini**: `text-embedding-004` (768 dimensions)
+- **Vertex AI**: `text-embedding-005` (768 dimensions)
+- **Voyage**: `voyage-code-3` (optimized for code)
+- **OpenRouter**: Access to multiple embedding providers
+- Full list: [CocoIndex LLM integrations](https://cocoindex.io/docs/ai/llm#llm-api-integrations)
+
+See [CocoIndex embedding documentation](https://cocoindex.io/docs/ai/llm#text-embedding) for detailed configuration of each provider.
+
 ## Usage
 
 ### Interactive CLI
