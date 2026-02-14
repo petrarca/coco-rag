@@ -95,14 +95,15 @@ interface. See [reranker-design.md](reranker-design.md) for full details.
 ### MCP Server (`mcp_server.py`)
 
 FastMCP server exposing search capabilities to AI assistants via stdio or HTTP
-transport. Provides 4 tools:
+transport. Provides 5 tools:
 
 | Tool | Description |
 |------|-------------|
-| `search` | Semantic search with topic filter and reranker selection |
-| `list_topics` | Lists all indexed topics |
-| `get_file` | Retrieves full file content (reassembled from chunks) |
-| `list_files` | Browses indexed files with glob pattern filtering |
+| `search` | Semantic search with source/topic filter (source takes priority) and reranker selection |
+| `list_topics` | Lists all indexed topics (topics can be shared by multiple sources) |
+| `list_sources` | Lists all indexed sources (unique identifiers for each codebase) |
+| `get_file` | Retrieves full file content with source/topic filter (reassembled from chunks) |
+| `list_files` | Browses indexed files with source/topic filter and glob pattern filtering |
 
 ### CLI (`main.py`)
 

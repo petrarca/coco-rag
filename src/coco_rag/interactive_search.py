@@ -23,7 +23,7 @@ from rich.theme import Theme
 
 from .banner import display_welcome_message
 from .db import get_connection_pool
-from .vector_search import get_topics, search
+from .vector_search import get_sources, get_topics, search
 
 # Maximum number of results to retrieve per search query
 DEFAULT_TOP_K = 20
@@ -55,6 +55,7 @@ def display_help() -> None:
     # Add commands to the table
     help_table.add_row("/help", "Show this help message")
     help_table.add_row("/topics", "List all available topics")
+    help_table.add_row("/sources", "List all available sources")
     help_table.add_row("/topic <name>", "Set current topic filter")
     help_table.add_row("/reranker <type>", "Set current reranker (auto, pure_functional, spacy_nlp, disabled)")
     help_table.add_row("/reset", "Clear current topic filter")
@@ -128,6 +129,9 @@ def _handle_command(
         return True, current_topic, False, current_reranker
     elif query.lower() == "/topics":
         display_topics(pool)
+        return True, current_topic, False, current_reranker
+    elif query.lower() == "/sources":
+        display_sources(pool)
         return True, current_topic, False, current_reranker
     elif query.lower() == "/reset":
         console.print(f"[info]Topic filter reset. Was: [bold]{current_topic}[/bold][/info]")
@@ -406,3 +410,32 @@ def display_topics(pool: ConnectionPool) -> None:
     console.print(table)
     console.print("\n[dim]Use [bold]/topic <name>[/bold] to set a topic filter for all searches.[/dim]")
     console.print("[dim]Use [bold]/reset[/bold] to clear the topic filter.[/dim]")
+
+
+def display_sources(pool: ConnectionPool) -> None:
+    """Display all available sources in the indexed content."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[info]Fetching sources...[/info]"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Fetching", total=None)
+        sources = get_sources(pool)
+        progress.update(task, completed=True)
+
+    if not sources:
+        console.print("\n[warning]No sources found in the indexed content.[/warning]")
+        return
+
+    # Create a table to display sources
+    table = Table(title="Available Sources", show_header=True)
+    table.add_column("#", style="dim")
+    table.add_column("Source", style="cyan")
+
+    # Add sources to the table
+    for i, source in enumerate(sources, 1):
+        table.add_row(str(i), source)
+
+    console.print("\n[bold]Available Sources:[/bold]")
+    console.print(table)
+    console.print("\n[dim]Note: Use MCP server tools to filter by source (source parameter takes priority over topic).[/dim]")

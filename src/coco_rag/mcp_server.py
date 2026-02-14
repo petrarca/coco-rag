@@ -22,7 +22,7 @@ from fastmcp import FastMCP
 
 from .db import get_connection_pool
 from .vector_search import get_file as get_file_function
-from .vector_search import get_topics
+from .vector_search import get_sources, get_topics
 from .vector_search import list_files as list_files_function
 from .vector_search import search as search_function
 
@@ -38,13 +38,16 @@ class MCPServer:
         """Setup MCP handlers."""
 
         @self.mcp.tool()
-        def search(query: str, top_k: int = 10, topic: Optional[str] = None, reranker: Optional[str] = "auto") -> list[dict[str, Any]]:
+        def search(
+            query: str, top_k: int = 10, source: Optional[str] = None, topic: Optional[str] = None, reranker: Optional[str] = "auto"
+        ) -> list[dict[str, Any]]:
             """Search for code using semantic similarity with optional reranking.
 
             Args:
                 query: Search query string
                 top_k: Maximum number of results to return (default: 10)
-                topic: Optional topic filter for search scope
+                source: Optional source filter (takes priority if provided)
+                topic: Optional topic filter (used if source is not provided)
                 reranker: Optional reranker type (default: "auto")
 
             Available reranker options:
@@ -54,10 +57,10 @@ class MCPServer:
             - "disabled": Disable reranking, use vector similarity only
 
             Returns:
-                List of search results with filename, code, score, and location
+                List of search results with filename, code, source, topic, score, and location
             """
             pool = get_connection_pool()
-            results = search_function(pool, query, top_k, topic, reranker_type=reranker)
+            results = search_function(pool, query, top_k, source, topic, reranker_type=reranker)
 
             return [
                 {
@@ -66,6 +69,7 @@ class MCPServer:
                     "score": self._get_score(result),
                     "start": result.get("start") if isinstance(result, dict) else result.start,
                     "end": result.get("end") if isinstance(result, dict) else result.end,
+                    "source": result.get("source") if isinstance(result, dict) else getattr(result, "source", None),
                     "topic": result.get("topic") if isinstance(result, dict) else result.topic,
                 }
                 for result in results
@@ -82,33 +86,46 @@ class MCPServer:
             return get_topics(pool)
 
         @self.mcp.tool()
+        def list_sources() -> list[str]:
+            """List all available sources in the indexed data.
+
+            Returns:
+                List of source name strings
+            """
+            pool = get_connection_pool()
+            return get_sources(pool)
+
+        @self.mcp.tool()
         def get_file(
             filename: str,
+            source: Optional[str] = None,
             topic: Optional[str] = None,
             start_line: Optional[int] = None,
             end_line: Optional[int] = None,
         ) -> dict[str, Any]:
             """Retrieve file content by path from the indexed data.
 
-            Reassembles the full file from indexed chunks. Use the filename
-            and topic values returned by the search tool. Optionally request
-            a specific line range to reduce output size.
+            Reassembles the full file from indexed chunks. Use the filename,
+            source, and topic values returned by the search tool. Optionally
+            request a specific line range to reduce output size.
 
             Args:
                 filename: Relative file path as returned by search results
-                topic: Optional topic/source filter (use the topic from search results
+                source: Optional source filter (takes priority if provided)
+                topic: Optional topic filter (use the topic from search results
                        to disambiguate if the same path exists in multiple sources)
                 start_line: Optional start line (1-based, inclusive)
                 end_line: Optional end line (1-based, inclusive)
 
             Returns:
-                Dict with filename, topic, content, total_lines, start_line, end_line
+                Dict with filename, source, topic, content, total_lines, start_line, end_line
             """
             pool = get_connection_pool()
-            return get_file_function(pool, filename, topic, start_line, end_line)
+            return get_file_function(pool, filename, source, topic, start_line, end_line)
 
         @self.mcp.tool()
         def list_files(
+            source: Optional[str] = None,
             topic: Optional[str] = None,
             path_prefix: Optional[str] = None,
             pattern: Optional[str] = None,
@@ -116,21 +133,22 @@ class MCPServer:
         ) -> list[dict[str, Any]]:
             """List indexed files with optional filtering.
 
-            Browse the indexed file tree. Supports filtering by topic,
-            directory prefix, and glob patterns. Use this to explore what
+            Browse the indexed file tree. Supports filtering by source (takes priority),
+            topic, directory prefix, and glob patterns. Use this to explore what
             files are available before retrieving them with get_file.
 
             Args:
-                topic: Optional topic/source filter (e.g. "my_project", "backend")
+                source: Optional source filter (takes priority if provided, e.g. "cgm_stella_tenant")
+                topic: Optional topic filter (used if source is not provided, e.g. "cgm-stella")
                 path_prefix: Optional directory prefix (e.g. "backend/platform-services/")
                 pattern: Optional glob pattern (e.g. "*.py", "**/test_*.py")
                 limit: Maximum number of results (default: 100)
 
             Returns:
-                List of dicts with filename, topic, and chunk_count
+                List of dicts with filename, source, topic, and chunk_count
             """
             pool = get_connection_pool()
-            return list_files_function(pool, topic, path_prefix, pattern, limit)
+            return list_files_function(pool, source, topic, path_prefix, pattern, limit)
 
     def _get_score(self, result: Any) -> float:
         """Extract score from result, preferring rerank_score if available."""

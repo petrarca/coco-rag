@@ -114,12 +114,13 @@ task run:cli
 task run:cli -- --config /path/to/custom-config.yml
 
 # Interactive commands:
-# /help           - Show available commands
-# /topics         - List all available topics
-# /topic <name>   - Set topic filter
+# /help            - Show available commands
+# /topics          - List all available topics
+# /sources         - List all available sources
+# /topic <name>    - Set topic filter
 # /reranker <type> - Set reranker (auto, pure_functional, spacy_nlp, disabled)
-# /reset          - Clear topic filter
-# /quit           - Exit
+# /reset           - Clear topic filter
+# /quit            - Exit
 ```
 
 ### Index Management
@@ -148,10 +149,13 @@ task run:mcp -- --config /path/to/custom-config.yml
 ```
 
 **Available MCP Tools**:
-- `search(query, top_k=10, topic=None, reranker="auto")` → Ranked code chunks
+- `search(query, top_k=10, source=None, topic=None, reranker="auto")` → Ranked code chunks with optional source/topic filtering
 - `list_topics()` → List all available topics
-- `get_file(filename, topic=None, start_line=None, end_line=None)` → Full file content reassembled from chunks
-- `list_files(topic=None, path_prefix=None, pattern=None, limit=100)` → Browse indexed files
+- `list_sources()` → List all available sources
+- `get_file(filename, source=None, topic=None, start_line=None, end_line=None)` → Full file content reassembled from chunks
+- `list_files(source=None, topic=None, path_prefix=None, pattern=None, limit=100)` → Browse indexed files
+
+**Note**: `source` parameter takes priority over `topic`. Use `source` for precise filtering (e.g., `cgm_stella_tenant`) or `topic` for broader filtering (e.g., `cgm-stella` includes multiple sources).
 
 ### Direct Python Invocation
 

@@ -101,26 +101,28 @@ def _generate_embedding(query: str) -> list[float]:
     return code_to_embedding.eval(query)
 
 
-def _execute_search(pool: ConnectionPool, table_name: str, query_vector: list[float], topic: Optional[str], top_k: int) -> list[dict[str, Any]]:
+def _execute_search(
+    pool: ConnectionPool,
+    table_name: str,
+    query_vector: list[float],
+    source: Optional[str],
+    topic: Optional[str],
+    top_k: int,
+) -> list[dict[str, Any]]:
     """Execute search query.
 
     Args:
         pool: Database connection pool
         table_name: Name of the table to query
         query_vector: Embedding vector for the query
+        source: Optional source filter (takes priority over topic)
         topic: Optional topic filter
         top_k: Maximum number of results to return
 
     Returns:
         List of search results
     """
-    if topic:
-        results = _execute_search_query(pool, table_name, query_vector, topic, top_k)
-    else:
-        # Pass top_k explicitly to avoid accidentally binding it to the 'topic' parameter
-        results = _execute_search_query(pool, table_name, query_vector, top_k=top_k)
-
-    return results
+    return _execute_search_query(pool, table_name, query_vector, source=source, topic=topic, top_k=top_k)
 
 
 def _process_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -136,7 +138,13 @@ def _process_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def search(
-    pool: ConnectionPool, query: str, top_k: int = 5, topic: str = None, enable_reranking: bool = None, reranker_type: str = None
+    pool: ConnectionPool,
+    query: str,
+    top_k: int = 5,
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    enable_reranking: Optional[bool] = None,
+    reranker_type: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """
     Search for code snippets using semantic similarity with optional reranking.
@@ -145,16 +153,18 @@ def search(
         pool: Database connection pool
         query: The search query to find similar code
         top_k: Maximum number of results to return (default: 5)
-        topic: Optional source key to restrict search to a specific source
+        source: Optional source filter (takes priority if provided)
+        topic: Optional topic filter (used if source is not provided)
         enable_reranking: Override for reranking. If None, uses global setting from environment.
         reranker_type: Explicit reranker type (auto, pure_functional, spacy_nlp, disabled).
                       If None, uses configuration-based selection.
 
     Returns:
-        List of search results with filename, code, score, and line positions
+        List of search results with filename, code, score, start, end, topic, and source
     """
     # Log search parameters
-    logger.info(f"Performing semantic search with query: '{query}', top_k={top_k}, topic={topic or 'None'}")
+    filter_desc = f"source={source}" if source else f"topic={topic}" if topic else "no filter"
+    logger.info(f"Performing semantic search with query: '{query}', top_k={top_k}, {filter_desc}")
 
     # Determine if reranking should be used
     # Explicitly disable if reranker_type is "disabled"
@@ -174,7 +184,7 @@ def search(
     # Execute initial search with more candidates if reranking is enabled
     candidate_count = top_k * _get_search_config().get_candidate_multiplier() if use_reranking else top_k
     logger.debug(f"Retrieving {candidate_count} candidates ({'with' if use_reranking else 'without'} reranking)")
-    results = _execute_search(pool, table_name, query_vector, topic, candidate_count)
+    results = _execute_search(pool, table_name, query_vector, source, topic, candidate_count)
 
     # Apply reranking if enabled
     if use_reranking and results:
@@ -232,8 +242,39 @@ def get_topics(pool: ConnectionPool) -> list[str]:
             return [row[0] for row in cur.fetchall()]
 
 
+def get_sources(pool: ConnectionPool) -> list[str]:
+    """
+    Get a list of all available sources in the indexed content.
+
+    Args:
+        pool: Database connection pool
+
+    Returns:
+        List of unique source names
+    """
+    # Get the table name
+    table_name = cocoindex.utils.get_target_default_name(code_embedding_flow, get_table_name())
+
+    # Query distinct sources from the database
+    with pool.connection() as conn:
+        with conn.cursor() as cur:
+            query = f"""
+                SELECT DISTINCT source_name FROM {table_name} 
+                WHERE source_name IS NOT NULL AND source_name != ''
+                ORDER BY source_name
+            """
+            logger.debug(f"Executing SQL query to get sources:\n{query}")
+            cur.execute(query)
+            return [row[0] for row in cur.fetchall()]
+
+
 def _execute_search_query(
-    pool: ConnectionPool, table_name: str, query_vector: list[float], topic: Optional[str] = None, top_k: int = 5
+    pool: ConnectionPool,
+    table_name: str,
+    query_vector: list[float],
+    source: Optional[str] = None,
+    topic: Optional[str] = None,
+    top_k: int = 5,
 ) -> list[dict[str, Any]]:
     """Execute the search query against the database.
 
@@ -241,7 +282,8 @@ def _execute_search_query(
         pool: Database connection pool
         table_name: Name of the table to query
         query_vector: Embedding vector for the query
-        topic: Optional topic filter
+        source: Optional source filter (takes priority over topic)
+        topic: Optional topic filter (used if source is not provided)
         top_k: Maximum number of results to return
 
     Returns:
@@ -250,10 +292,21 @@ def _execute_search_query(
     with pool.connection() as conn:
         register_vector(conn)
         with conn.cursor() as cur:
-            if topic:
+            if source:
+                # Filter by source if provided (takes priority)
+                query = f"""
+                    SELECT filename, code, embedding <=> %s AS distance, start, "end", topic, source_name
+                    FROM {table_name} 
+                    WHERE source_name = %s
+                    ORDER BY distance LIMIT %s
+                """
+                params = (query_vector, source, top_k)
+                logger.debug(f"Executing SQL query with source filter '{source}', top_k={top_k}:\n{query}")
+                cur.execute(query, params)
+            elif topic:
                 # Filter by topic if provided
                 query = f"""
-                    SELECT filename, code, embedding <=> %s AS distance, start, "end", topic
+                    SELECT filename, code, embedding <=> %s AS distance, start, "end", topic, source_name
                     FROM {table_name} 
                     WHERE topic = %s
                     ORDER BY distance LIMIT %s
@@ -262,13 +315,13 @@ def _execute_search_query(
                 logger.debug(f"Executing SQL query with topic filter '{topic}', top_k={top_k}:\n{query}")
                 cur.execute(query, params)
             else:
-                # No topic filter
+                # No filter
                 query = f"""
-                    SELECT filename, code, embedding <=> %s AS distance, start, "end", topic
+                    SELECT filename, code, embedding <=> %s AS distance, start, "end", topic, source_name
                     FROM {table_name} ORDER BY distance LIMIT %s
                 """
                 params = (query_vector, top_k)
-                logger.debug(f"Executing SQL query without topic filter, top_k={top_k}:\n{query}")
+                logger.debug(f"Executing SQL query without filter, top_k={top_k}:\n{query}")
                 cur.execute(query, params)
             return [
                 {
@@ -278,6 +331,7 @@ def _execute_search_query(
                     "start": row[3],
                     "end": row[4],
                     "topic": row[5],
+                    "source": row[6],
                 }
                 for row in cur.fetchall()
             ]
@@ -347,6 +401,7 @@ def _get_language_from_extension(extension: str) -> str:
 def get_file(
     pool: ConnectionPool,
     filename: str,
+    source: Optional[str] = None,
     topic: Optional[str] = None,
     start_line: Optional[int] = None,
     end_line: Optional[int] = None,
@@ -360,22 +415,32 @@ def get_file(
     Args:
         pool: Database connection pool
         filename: Relative file path as stored in the index
-        topic: Optional topic/source filter (needed if the same filename exists in multiple sources)
+        source: Optional source filter (takes priority if provided)
+        topic: Optional topic filter (used if source is not provided)
         start_line: Optional start line (1-based, inclusive). If None, starts from beginning.
         end_line: Optional end line (1-based, inclusive). If None, goes to end of file.
 
     Returns:
-        Dict with keys: filename, topic, content, total_lines, start_line, end_line
+        Dict with keys: filename, source, topic, content, total_lines, start_line, end_line
         Returns empty content and total_lines=0 if file not found.
     """
     table_name = cocoindex.utils.get_target_default_name(code_embedding_flow, get_table_name())
 
     with pool.connection() as conn:
         with conn.cursor() as cur:
-            if topic:
+            if source:
                 query = f"""
                     SELECT code, (start->>'offset')::int AS start_offset,
-                           ("end"->>'offset')::int AS end_offset, topic
+                           ("end"->>'offset')::int AS end_offset, topic, source_name
+                    FROM {table_name}
+                    WHERE filename = %s AND source_name = %s
+                    ORDER BY start_offset
+                """
+                cur.execute(query, (filename, source))
+            elif topic:
+                query = f"""
+                    SELECT code, (start->>'offset')::int AS start_offset,
+                           ("end"->>'offset')::int AS end_offset, topic, source_name
                     FROM {table_name}
                     WHERE filename = %s AND topic = %s
                     ORDER BY start_offset
@@ -384,7 +449,7 @@ def get_file(
             else:
                 query = f"""
                     SELECT code, (start->>'offset')::int AS start_offset,
-                           ("end"->>'offset')::int AS end_offset, topic
+                           ("end"->>'offset')::int AS end_offset, topic, source_name
                     FROM {table_name}
                     WHERE filename = %s
                     ORDER BY start_offset
@@ -393,10 +458,12 @@ def get_file(
 
             rows = cur.fetchall()
 
+    filter_desc = f"source={source}" if source else f"topic={topic}" if topic else "no filter"
     if not rows:
-        logger.warning(f"File not found: {filename} (topic={topic})")
+        logger.warning(f"File not found: {filename} ({filter_desc})")
         return {
             "filename": filename,
+            "source": source,
             "topic": topic,
             "content": "",
             "total_lines": 0,
@@ -409,10 +476,11 @@ def get_file(
     # We track a cursor of the highest byte offset written so far
     # and only append the non-overlapping portion of each chunk.
     file_topic = rows[0][3]
+    file_source = rows[0][4]
     content_parts: list[str] = []
     cursor = 0  # next byte offset to write
 
-    for code, start_offset, end_offset, _ in rows:
+    for code, start_offset, end_offset, _, _ in rows:
         if start_offset >= cursor:
             # No overlap — append the full chunk (possibly with gap filled by newline)
             if cursor > 0 and start_offset > cursor:
@@ -449,6 +517,7 @@ def get_file(
 
     return {
         "filename": filename,
+        "source": file_source,
         "topic": file_topic,
         "content": content,
         "total_lines": total_lines,
@@ -459,6 +528,7 @@ def get_file(
 
 def list_files(
     pool: ConnectionPool,
+    source: Optional[str] = None,
     topic: Optional[str] = None,
     path_prefix: Optional[str] = None,
     pattern: Optional[str] = None,
@@ -468,13 +538,14 @@ def list_files(
 
     Args:
         pool: Database connection pool
-        topic: Optional topic/source filter
+        source: Optional source filter (takes priority if provided)
+        topic: Optional topic filter (used if source is not provided)
         path_prefix: Optional directory prefix filter (e.g. "backend/platform-services/")
         pattern: Optional glob pattern (e.g. "*.py", "**/test_*.py")
         limit: Maximum number of results to return (default: 100)
 
     Returns:
-        List of dicts with keys: filename, topic, chunk_count
+        List of dicts with keys: filename, source, topic, chunk_count
     """
     table_name = cocoindex.utils.get_target_default_name(code_embedding_flow, get_table_name())
 
@@ -482,7 +553,10 @@ def list_files(
     conditions: list[str] = []
     params: list[Any] = []
 
-    if topic:
+    if source:
+        conditions.append("source_name = %s")
+        params.append(source)
+    elif topic:
         conditions.append("topic = %s")
         params.append(topic)
 
@@ -495,24 +569,26 @@ def list_files(
     with pool.connection() as conn:
         with conn.cursor() as cur:
             query = f"""
-                SELECT filename, topic, COUNT(*) AS chunk_count
+                SELECT filename, source_name, topic, COUNT(*) AS chunk_count
                 FROM {table_name}
                 {where_clause}
-                GROUP BY filename, topic
+                GROUP BY filename, source_name, topic
                 ORDER BY filename
             """
-            logger.debug(f"Listing files with filters: topic={topic}, path_prefix={path_prefix}, pattern={pattern}")
+            filter_desc = f"source={source}" if source else f"topic={topic}" if topic else "no filter"
+            logger.debug(f"Listing files with filters: {filter_desc}, path_prefix={path_prefix}, pattern={pattern}")
             cur.execute(query, params)
             rows = cur.fetchall()
 
     # Apply glob pattern filter in Python (fnmatch supports *, ?, [seq] patterns)
     results: list[dict[str, Any]] = []
-    for filename, row_topic, chunk_count in rows:
+    for filename, row_source, row_topic, chunk_count in rows:
         if pattern and not fnmatch.fnmatch(filename, pattern):
             continue
         results.append(
             {
                 "filename": filename,
+                "source": row_source,
                 "topic": row_topic,
                 "chunk_count": chunk_count,
             }
@@ -520,7 +596,8 @@ def list_files(
         if len(results) >= limit:
             break
 
-    logger.info(f"Listed {len(results)} files (topic={topic}, prefix={path_prefix}, pattern={pattern})")
+    filter_desc = f"source={source}" if source else f"topic={topic}" if topic else "no filter"
+    logger.info(f"Listed {len(results)} files ({filter_desc}, prefix={path_prefix}, pattern={pattern})")
     return results
 
 
