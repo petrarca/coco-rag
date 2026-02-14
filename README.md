@@ -1,4 +1,6 @@
-# CocoRAG
+<p align="center">
+  <img src="docs/images/cocorag.png" alt="CocoRAG" width="600">
+</p>
 
 A semantic code search and indexing system that enables AI-powered code discovery and analysis. CocoRAG (Code Context Retrieval Augmented Generation) indexes your codebases using embeddings and provides powerful search capabilities through both interactive CLI and MCP server interfaces.
 
