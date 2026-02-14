@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        python-version: ['3.14']
+        python-version: ['3.13']
 
     steps:
       - name: Checkout repository
@@ -72,16 +72,16 @@ jobs:
             pkg-config
 
       - name: Create virtual environment
-        run: uv venv
+        run: uv venv --python 3.13
 
       - name: Install build dependencies
-        run: uv pip install setuptools
+        run: uv pip install --python .venv/bin/python setuptools
 
       - name: Install PyTorch CPU-only (avoid CUDA download)
-        run: uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+        run: uv pip install --python .venv/bin/python torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install dependencies
-        run: uv pip install --no-build-isolation -e ".[dev]"
+        run: uv pip install --python .venv/bin/python --no-build-isolation -e ".[dev]"
 
       - name: Format check
         run: .venv/bin/ruff format --check src tests

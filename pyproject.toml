@@ -7,20 +7,21 @@ name = "CocoRAG"
 version = "0.1.0"
 description = "A semantic code search and indexing system that enables AI-powered code discovery and analysis"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 license = {text = "MIT"}
 authors = [
     {name = "Wolfgang Miller"},
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.13",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
       "cocoindex[embeddings]==0.3.31",
     "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.2.1",
     "pgvector>=0.4.1",
     "psycopg[binary,pool]",
     "loguru>=0.7.0",
@@ -47,7 +48,7 @@ packages = ["coco_rag", "coco_rag.rerankers"]
 
 [tool.ruff]
 line-length = 150
-target-version = "py314"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "C90"]

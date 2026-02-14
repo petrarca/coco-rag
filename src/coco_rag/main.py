@@ -7,6 +7,14 @@ This module provides the command-line interface for CocoRAG, including:
 - FlowLiveUpdater integration for detailed statistics
 """
 
+# Load .env file FIRST, before any other imports
+# This ensures Rust environment variables (RUST_LOG, COCOINDEX_*) are available
+# when cocoindex is imported and initialized
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ruff: noqa: E402 - imports must come after load_dotenv()
 import sys
 from typing import Optional
 

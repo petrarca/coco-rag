@@ -2,11 +2,11 @@ version: '3'
 
 tasks:
   setup:
-    desc: Create Python virtual environment
+    desc: Create Python virtual environment with Python 3.13
     cmds:
       - |
         if [ ! -d .venv ]; then
-          uv venv
+          uv venv --python 3.13
         else
           echo "Virtual environment already exists"
         fi
@@ -15,7 +15,7 @@ tasks:
     desc: Install package in development mode
     deps: [setup]
     cmds:
-      - uv pip install --no-build-isolation -e ".[dev]"
+      - uv pip install --python .venv/bin/python --no-build-isolation -e ".[dev]"
 
   install:all:
     desc: Install package and spaCy with English language model
@@ -151,12 +151,12 @@ tasks:
     cmds:
       - |
         if [ ! -d .venv ]; then
-          uv venv
+          uv venv --python 3.13
         fi
-      - uv pip install -e ".[dev]"
-      - uv sync --extra spacy --extra dev
-      - uv pip install pip  # Ensure pip is available
-      - uv run python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+      - uv pip install --python .venv/bin/python -e ".[dev]"
+      - uv sync --python .venv/bin/python --extra spacy --extra dev
+      - uv pip install --python .venv/bin/python pip
+      - .venv/bin/python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
       - echo "✅ spaCy and en_core_web_sm model installed successfully"
 
   spacy:install:medium:
@@ -165,12 +165,12 @@ tasks:
     cmds:
       - |
         if [ ! -d .venv ]; then
-          uv venv
+          uv venv --python 3.13
         fi
-      - uv pip install -e ".[dev]"
-      - uv sync --extra spacy --extra dev
-      - uv pip install pip  # Ensure pip is available
-      - uv run python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl
+      - uv pip install --python .venv/bin/python -e ".[dev]"
+      - uv sync --python .venv/bin/python --extra spacy --extra dev
+      - uv pip install --python .venv/bin/python pip
+      - .venv/bin/python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl
       - echo "✅ spaCy and en_core_web_md model installed successfully"
 
   spacy:install:large:
@@ -179,26 +179,25 @@ tasks:
     cmds:
       - |
         if [ ! -d .venv ]; then
-          uv venv
+          uv venv --python 3.13
         fi
-      - uv pip install -e ".[dev]"
-      - uv sync --extra spacy --extra dev
-      - uv pip install pip  # Ensure pip is available
-      - uv run python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+      - uv pip install --python .venv/bin/python -e ".[dev]"
+      - uv sync --python .venv/bin/python --extra spacy --extra dev
+      - uv pip install --python .venv/bin/python pip
+      - .venv/bin/python -m pip install https://github.com/explosion/spaCy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
       - echo "✅ spaCy and en_core_web_lg model installed successfully"
 
   spacy:list-models:
-    desc: List available spaCy models
-    deps: [spacy:install]
+    desc: List installed spaCy models and validate them
     cmds:
-      - uv run python -m spacy download --help
+      - uv run python -m spacy validate
 
   spacy:test:
     desc: Test spaCy installation and model loading
     deps: [spacy:install]
     cmds:
       - |
-        uv run python -c "
+        .venv/bin/python -c "
         import spacy
         try:
             nlp = spacy.load('en_core_web_sm')
@@ -210,3 +209,9 @@ tasks:
         except Exception as e:
             print(f'❌ Error: {e}')
         "
+
+  spacy:uninstall:
+    desc: Uninstall spaCy and all language models
+    cmds:
+      - uv pip uninstall spacy spacy-legacy spacy-loggers en-core-web-sm en-core-web-md en-core-web-lg
+      - echo "✅ spaCy and language models uninstalled successfully"

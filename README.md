@@ -46,7 +46,7 @@ settings:
 
 ### Prerequisites
 
-- Python 3.14+
+- Python 3.13+
 - PostgreSQL 12+ with pgvector extension
 - [uv](https://github.com/astral-sh/uv) package manager
 - [Task](https://taskfile.dev/) task runner (optional but recommended)
@@ -194,7 +194,16 @@ task rebuild   # Clean all files, reinstall, and run tests
 - `task run:mcp` - Start MCP server
 
 **Optional Components**:
-- `task spacy:install` - Install spaCy for advanced NLP reranking
+```bash
+# spaCy (optional) - Advanced NLP-based reranking for natural language queries
+task spacy:install          # Small model (recommended, ~15MB)
+task spacy:install:medium   # Medium model (~40MB, better accuracy)
+task spacy:install:large    # Large model (~500MB, best accuracy)
+
+# CocoRAG works without spaCy using pure_functional reranking
+# Install spaCy for improved results with natural language queries like:
+# "how to handle authentication errors" or "explain error handling"
+```
 
 ## Environment Variables
 
