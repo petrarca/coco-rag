@@ -19,7 +19,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "cocoindex[embeddings]>=0.3.8",
+      "cocoindex[embeddings]==0.3.31",
     "pydantic-settings>=2.0.0",
     "pgvector>=0.4.1",
     "psycopg[binary,pool]",
